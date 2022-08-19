@@ -1,4 +1,7 @@
+import 'package:agora_group/main.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:tflite/tflite.dart';
 import '../utils/app_id.dart';
 import 'package:agora_rtc_engine/rtc_engine.dart';
 import 'package:agora_rtc_engine/rtc_local_view.dart' as RtcLocalView;
@@ -17,6 +20,9 @@ class _CallPageState extends State<CallPage> {
   final _infoStrings = <String>[];
   bool muted = false;
   RtcEngine? _engine;
+  CameraImage? cameraImage;
+  CameraController? cameraController;
+  String output = '';
 
   @override
   void dispose() {
@@ -33,6 +39,51 @@ class _CallPageState extends State<CallPage> {
     super.initState();
     // initialize agora sdk
     initialize();
+    loadCamera();
+    loadModel();
+  }
+
+  loadModel() async {
+    await Tflite.loadModel(
+        model: "assets/model.tflite", labels: "assets/labels.txt");
+  }
+
+  loadCamera() {
+    cameraController = CameraController(cameras![1], ResolutionPreset.medium);
+    cameraController!.initialize().then((value) {
+      if (!mounted) {
+        return;
+      } else {
+        setState(() {
+          cameraController!.startImageStream((imageStream) {
+            cameraImage = imageStream;
+            runModel();
+          });
+        });
+      }
+    });
+  }
+
+  runModel() async {
+    if (cameraImage != null) {
+      var predictions = await Tflite.runModelOnFrame(
+          bytesList: cameraImage!.planes.map((plane) {
+            return plane.bytes;
+          }).toList(),
+          imageHeight: cameraImage!.height,
+          imageWidth: cameraImage!.width,
+          imageMean: 127.5,
+          imageStd: 127.5,
+          rotation: 90,
+          numResults: 5,
+          threshold: 0.1,
+          asynch: true);
+      predictions!.forEach((element) {
+        setState(() {
+          output = element.toString();
+        });
+      });
+    }
   }
 
   Future<void> initialize() async {
@@ -47,7 +98,7 @@ class _CallPageState extends State<CallPage> {
     }
     await _initAgoraRtcEngine();
     _addAgoraEventHandlers();
-    await _engine!.joinChannel(null, widget.channelName, null, 0);
+    await _engine!.joinChannel(temptoken, widget.channelName, null, 0);
   }
 
   Future<void> _initAgoraRtcEngine() async {
@@ -110,6 +161,13 @@ class _CallPageState extends State<CallPage> {
           children: <Widget>[
             _viewRows(),
             _toolbar(),
+            !cameraController!.value.isInitialized
+                ? Container()
+                : AspectRatio(
+                    aspectRatio: cameraController!.value.aspectRatio,
+                    child: CameraPreview(cameraController!),
+                  ),
+            Text(output)
           ],
         ),
       ),

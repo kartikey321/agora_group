@@ -1,1 +1,3 @@
-var appID = 'f7792319ecf343f785405cd6bee6b078';
+const appID = 'f7792319ecf343f785405cd6bee6b078';
+const temptoken =
+    "006f7792319ecf343f785405cd6bee6b078IADs2cDszkUMSaXed93UYQt60PC6f3GRJkn3LnXASiftCgx+f9gAAAAAEACg5VEV76v0YgEAAQDpq/Ri";
